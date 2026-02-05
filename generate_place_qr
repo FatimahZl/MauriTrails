@@ -1,0 +1,172 @@
+<?php
+session_start();
+require_once "config.php";
+
+if (!isset($_SESSION["user_id"])) {
+    header("location: index.php");
+    exit;
+}
+
+if (!isset($_GET['place_id'])) {
+    die("Place ID not provided");
+}
+
+$place_id = intval($_GET['place_id']);
+
+
+$sql = "SELECT * FROM places WHERE place_id = ?";
+$stmt = mysqli_prepare($conn, $sql);
+mysqli_stmt_bind_param($stmt, "i", $place_id);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+$place = mysqli_fetch_assoc($result);
+
+if (!$place) {
+    die("Place not found");
+}
+
+$place_data = [
+    'id' => $place['place_id'],
+    'name' => $place['name'],
+    'description' => $place['description'],
+    'history' => $place['history'],
+    'category' => $place['category'],
+    'address' => $place['address'],
+    'latitude' => $place['latitude'],
+    'longitude' => $place['longitude'],
+    'visiting_hours' => $place['visiting_hours'],
+    'entry_fee' => $place['entry_fee'],
+    'email' => $place['email'],
+    'website' => $place['website'],
+    'status' => $place['status'],
+    'main_image' => $place['main_image']
+];
+
+$qr_data = json_encode($place_data);
+
+$place_url = "https://" . $_SERVER['HTTP_HOST'] . "/view_place_details.php?place_id=" . $place_id;
+
+mysqli_stmt_close($stmt);
+mysqli_close($conn);
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code - <?php echo htmlspecialchars($place['name']); ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(45deg, #0b3842, #AA895F);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Poppins', sans-serif;
+        }
+        .qr-container {
+            background: #2d5760;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            text-align: center;
+            color: white;
+            max-width: 500px;
+        }
+        #qrcode {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            display: inline-block;
+            margin: 20px 0;
+        }
+        .place-name {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .btn-custom {
+            margin: 10px 5px;
+            padding: 10px 25px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="qr-container">
+        <h2 class="mb-4">Place QR Code</h2>
+        <div class="place-name"><?php echo htmlspecialchars($place['name']); ?></div>
+        <p class="text-muted"><?php echo htmlspecialchars($place['category']); ?></p>
+        
+        <div id="qrcode"></div>
+        
+        <div class="mt-4">
+            <button onclick="downloadQR()" class="btn btn-light btn-custom">
+                <i class="fas fa-download"></i> Download QR Code
+            </button>
+            <button onclick="printQR()" class="btn btn-outline-light btn-custom">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <a href="dashboard.php" class="btn btn-secondary btn-custom">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+        
+        <div class="mt-4">
+            <small class="text-muted">Scan this QR code to view place details</small>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+    <script>
+
+        const placeURL = '<?php echo $place_url; ?>';
+        const placeData = <?php echo $qr_data; ?>;
+        
+
+        new QRCode(document.getElementById("qrcode"), {
+            text: placeURL,
+            width: 256,
+            height: 256,
+            colorDark: "#0b3842",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
+
+        function downloadQR() {
+            const canvas = document.querySelector('#qrcode canvas');
+            const url = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = 'qr-<?php echo preg_replace('/[^a-z0-9]/i', '-', strtolower($place['name'])); ?>.png';
+            link.href = url;
+            link.click();
+        }
+
+        function printQR() {
+            window.print();
+        }
+    </script>
+    
+    <style media="print">
+        body * {
+            visibility: hidden;
+        }
+        .qr-container, .qr-container * {
+            visibility: visible;
+        }
+        .qr-container {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .btn-custom {
+            display: none;
+        }
+    </style>
+</body>
+</html>
